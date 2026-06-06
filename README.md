@@ -67,6 +67,7 @@ python scripts/prepare_mock_data.py
 python scripts/run_field_eval.py
 python scripts/export_error_cases.py
 python scripts/build_instruction_data.py --input data/processed/mock_qa.csv --strategy image_ocr --output data/processed/instructions_mock_image_ocr.jsonl
+python scripts/split_instruction_data.py --input data/processed/instructions_mock_image_ocr.jsonl --train-output data/processed/train_instructions.jsonl --eval-output data/processed/eval_instructions.jsonl --eval-ratio 0.2 --seed 42
 python scripts/check_vlm_env.py
 python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend dummy --output outputs/metrics/vlm_baseline_dummy_image_ocr.json
 python scripts/compare_baselines.py
@@ -86,6 +87,7 @@ If `WORKFLOW_AGENT_URL` is set, the workflow demo will POST to that service. Oth
 - instruction-answer JSONL construction for `ocr_only`, `image_only`, and `image_ocr`
 - Qwen2.5-VL, LLaVA, and dummy VLM runner interfaces
 - VLM baseline script with skipped metrics when the model environment is unavailable
+- AutoDL runbook plus SFT readiness checks that do not start training
 - exact match, normalized exact match, regex match, field accuracy, per-field accuracy, missing field rate, and multi-value conflict rate
 - error case CSV export plus `outputs/error_cases/analysis_report.md`
 - Workflow-Agent payload builder and optional client POST
@@ -136,6 +138,26 @@ python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy
 ```
 
 If dependencies, model files, network access, image files, or GPU resources are unavailable, the result is `skipped=true` with a `skip_reason`. A skipped result is an environment or availability status, not evidence that the model is inaccurate. Skipped runs must not be reported as real VLM metrics. Prediction postprocessing only strips common answer prefixes and lightly extracts amount/date/id values for evaluation normalization; it is not a substitute for model correctness.
+
+## AutoDL Qwen2.5-VL Run
+
+See [docs/autodl_qwen_vl_runbook.md](docs/autodl_qwen_vl_runbook.md) for the full AutoDL setup and troubleshooting guide. The recommended order is smoke baseline first, LoRA later:
+
+```bash
+python scripts/check_vlm_env.py
+python scripts/prepare_mock_data.py
+python scripts/build_instruction_data.py --input data/processed/mock_qa.csv --strategy image_ocr --output data/processed/instructions_mock_image_ocr.jsonl
+python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen2.5-VL-3B-Instruct --max-samples 3 --smoke-test --output outputs/metrics/vlm_baseline_qwen_image_ocr_smoke.json
+```
+
+Before any LoRA SFT attempt, split the instruction data and run readiness checks:
+
+```bash
+python scripts/split_instruction_data.py --input data/processed/instructions_mock_image_ocr.jsonl --train-output data/processed/train_instructions.jsonl --eval-output data/processed/eval_instructions.jsonl --eval-ratio 0.2 --seed 42
+python scripts/check_sft_readiness.py --instruction-file data/processed/instructions_mock_image_ocr.jsonl --model-name /root/autodl-tmp/models/Qwen2.5-VL-3B-Instruct --baseline-metrics outputs/metrics/vlm_baseline_qwen_image_ocr_smoke.json
+```
+
+Current mock data is intentionally too small for meaningful SFT. Do not train directly from the 39 mock QA rows; first obtain a real Qwen2.5-VL image+OCR baseline, enough instruction samples, valid image paths, train/eval split, CUDA, and required training packages.
 
 ## Real Data Commands
 
