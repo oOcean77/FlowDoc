@@ -24,15 +24,19 @@ class Qwen25VLRunner(VLMRunner):
         max_new_tokens: int = 64,
         temperature: float = 0.0,
         do_sample: bool = False,
+        lora_adapter: str | None = None,
     ) -> None:
         self.model_name = model_name
         self.device = device
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.do_sample = do_sample
+        self.lora_adapter = lora_adapter
         is_local_path = _looks_like_local_path(model_name)
         if is_local_path and not Path(model_name).exists():
             raise FileNotFoundError(f"Local Qwen2.5-VL model path does not exist: {model_name}")
+        if lora_adapter and not Path(lora_adapter).exists():
+            raise FileNotFoundError(f"LoRA adapter path does not exist: {lora_adapter}")
         try:
             import torch
             from qwen_vl_utils import process_vision_info
@@ -53,13 +57,20 @@ class Qwen25VLRunner(VLMRunner):
                 device_map=device_map,
                 local_files_only=local_files_only,
             )
+            if lora_adapter:
+                try:
+                    from peft import PeftModel
+                except ImportError as exc:
+                    raise ImportError("PEFT is required to load a LoRA adapter. Install peft before adapter evaluation.") from exc
+                self.model = PeftModel.from_pretrained(self.model, lora_adapter)
             if device != "auto":
                 self.model = self.model.to(device)
         except Exception as exc:
+            adapter_note = f" Adapter path: {lora_adapter}." if lora_adapter else ""
             raise RuntimeError(
                 f"Unable to load Qwen2.5-VL model '{model_name}'. If this is a Hugging Face repo id, "
                 "download or cache it outside the repository first, then rerun the smoke test. If it is a local path, "
-                "confirm the directory contains a valid Qwen2.5-VL checkpoint."
+                f"confirm the directory contains a valid Qwen2.5-VL checkpoint.{adapter_note}"
             ) from exc
 
     def _resolve_image(self, image_path: str | None):

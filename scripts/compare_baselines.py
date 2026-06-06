@@ -51,16 +51,24 @@ def build_report(metrics_dir: Path = METRICS_DIR, output_path: Path = OUTPUT_PAT
     else:
         lines.extend(["- OCR metrics unavailable. Run `python scripts/run_field_eval.py` first.", ""])
 
-    lines.extend(["## VLM Baselines", "", "| Backend | Strategy | Status | Num Evaluated | Accuracy | Reason |", "| --- | --- | --- | ---: | ---: | --- |"])
+    lines.extend(
+        [
+            "## VLM Baselines",
+            "",
+            "| Backend | Strategy | Tuning | Status | Num Evaluated | Accuracy | Reason |",
+            "| --- | --- | --- | --- | ---: | ---: | --- |",
+        ]
+    )
     vlm_paths = sorted(metrics_dir.glob("vlm_baseline_*.json"))
     if not vlm_paths:
-        lines.append("| none | none | unavailable | 0 | unavailable | no VLM baseline metrics found |")
+        lines.append("| none | none | unavailable | unavailable | 0 | unavailable | no VLM baseline metrics found |")
     for path in vlm_paths:
         metrics = _load_json(path)
         status = _status(metrics)
         reason = metrics.get("skip_reason") or ""
+        tuning = "lora" if metrics.get("lora_adapter") else "zero-shot"
         lines.append(
-            f"| {metrics.get('backend')} | {metrics.get('strategy')} | {status} | "
+            f"| {metrics.get('backend')} | {metrics.get('strategy')} | {tuning} | {status} | "
             f"{metrics.get('num_evaluated', 0)} | {_format_metric(metrics.get('field_level_accuracy'))} | {reason} |"
         )
     lines.extend(

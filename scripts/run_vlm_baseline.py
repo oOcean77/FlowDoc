@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.eval.vlm_baseline import run_vlm_baseline
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run VLM inference baseline or a skipped dummy baseline.")
     parser.add_argument("--input", default="data/processed/mock_qa.csv")
     parser.add_argument("--strategy", required=True, choices=["ocr_only", "image_only", "image_ocr"])
@@ -22,7 +22,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--do-sample", action="store_true")
     parser.add_argument("--smoke-test", action="store_true")
-    return parser.parse_args()
+    parser.add_argument("--lora-adapter")
+    return parser.parse_args(argv)
 
 
 def main() -> int:
@@ -40,6 +41,7 @@ def main() -> int:
             temperature=args.temperature,
             do_sample=args.do_sample,
             smoke_test=args.smoke_test,
+            lora_adapter=args.lora_adapter,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

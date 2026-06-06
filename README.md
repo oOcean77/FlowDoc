@@ -183,7 +183,26 @@ Current limitations:
 - User prompt, OCR text, and prompt tokens are masked from loss in the text token sequence, but Qwen2.5-VL image token masking is marked as best-effort and must be audited before formal SFT.
 - Do not report dry-run loss or adapter outputs as model capability gains.
 - Formal SFT needs more real or realistic data, stable train/eval split, real zero-shot baseline metrics, CUDA, and verified adapter evaluation.
-- Loading a saved LoRA adapter through `run_vlm_baseline.py --lora-adapter ...` is a TODO; until that path is implemented and verified, do not report adapter evaluation metrics.
+- Loading a saved LoRA adapter through `run_vlm_baseline.py --lora-adapter ...` is supported; if the adapter path is missing or loading fails, the run is marked `skipped=true` and must not be reported as an adapter metric.
+
+## Evaluate LoRA Adapter
+
+After a LoRA adapter exists, evaluate it on the same input strategy and same evaluation CSV used by the zero-shot baselines:
+
+```bash
+python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --lora-adapter outputs/lora/qwen2_5_vl_flowdoc_dryrun --output outputs/metrics/vlm_baseline_qwen_lora_image_ocr_full.json
+python scripts/compare_baselines.py
+```
+
+The LoRA prediction CSV is written as:
+
+```text
+outputs/predictions/qwen2_5_vl_lora_image_ocr_predictions.csv
+```
+
+Only discuss LoRA improvement after adapter evaluation is complete and `skipped=false`. The 10-step smoke training mainly validates the training chain; with 39 mock instruction rows it can overfit and cannot support a formal model-capability claim. LoRA metrics must be compared against zero-shot baselines on the same input mode and evaluation set, such as the current AutoDL baselines: image-only `0.692`, image+OCR `0.718`, and OCR-only `0.744`.
+
+For adapter wrong-case review, filter the prediction CSV for rows where `pred_answer` does not match `gold_answer` after the same normalization used by evaluation. This project does not fabricate adapter error cases when adapter inference is skipped.
 
 ## Real Data Commands
 
