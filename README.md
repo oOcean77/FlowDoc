@@ -130,11 +130,25 @@ FlowDoc-VLM also includes field-aware relaxed metrics for diagnostics:
 - relaxed metrics help explain long-text failures, especially address extraction, where exact match is sensitive to line breaks, punctuation, word order, and OCR noise.
 - relaxed metrics do not replace post-processing. Address normalization, candidate line stitching, and field-specific cleanup are still required before production use.
 
+## Post-processing Pipeline
+
+Relaxed metrics are diagnostic; post-processing is the cleaning layer used before a prediction is sent to a workflow system or database. FlowDoc-VLM keeps the raw `pred_answer` and writes a separate `cleaned_pred_answer`, so original model/OCR output remains auditable.
+
+Run field-aware rule cleaning:
+
+```bash
+python scripts/postprocess_predictions.py --input-predictions outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv --output-predictions outputs/predictions/sroie_qwen_image_ocr_100_cleaned_predictions.csv --summary-output outputs/metrics/sroie_postprocess_summary.json
+python scripts/evaluate_cleaned_predictions.py --predictions outputs/predictions/sroie_qwen_image_ocr_100_cleaned_predictions.csv --answer-column cleaned_pred_answer --output outputs/metrics/sroie_qwen_image_ocr_100_cleaned_eval.json
+```
+
+The cleaner is rule-based rather than LLM-based because the current errors are mostly explainable format issues: currency markers, field prefixes, line breaks, repeated punctuation, and light label noise. Amount, date, and ID fields stay strict and do not use semantic guessing. Address and company fields get lightweight cleanup plus relaxed diagnostic metrics. Future low-confidence samples can be routed to an LLM-based schema enforcer if rule-based cleaning is insufficient.
+
 Related engineering notes:
 
 - [SROIE benchmark report](docs/sroie_benchmark_report.md)
 - [Engineering roadmap](docs/engineering_roadmap.md)
 - [Address error plan](docs/address_error_plan.md)
+- [Post-processing design](docs/postprocessing_design.md)
 - [ROI and deployment notes](docs/roi_and_deployment_notes.md)
 - [Final project summary](docs/final_project_summary.md)
 

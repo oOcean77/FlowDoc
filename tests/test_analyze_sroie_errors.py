@@ -20,6 +20,7 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
                 "field_name": "total_amount",
                 "gold_answer": "88.50",
                 "pred_answer": "$88.50",
+                "cleaned_pred_answer": "88.50",
                 "strategy": "image_ocr",
                 "backend": "qwen2_5_vl",
                 "skipped": False,
@@ -31,6 +32,7 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
                 "field_name": "address",
                 "gold_answer": "1 Main Road",
                 "pred_answer": "Warehouse Lane",
+                "cleaned_pred_answer": "1 Main Road",
                 "strategy": "image_ocr",
                 "backend": "qwen2_5_vl",
                 "skipped": False,
@@ -42,6 +44,7 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
                 "field_name": "company",
                 "gold_answer": "Shop Co",
                 "pred_answer": "",
+                "cleaned_pred_answer": "",
                 "strategy": "image_ocr",
                 "backend": "qwen2_5_vl",
                 "skipped": True,
@@ -58,6 +61,11 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
     assert summary["raw_accuracy"] == 0.0
     assert summary["normalized_accuracy"] == 0.5
     assert summary["relaxed_accuracy"] == 0.5
+    assert summary["postprocess_available"] is True
+    assert summary["cleaned_normalized_accuracy"] == 1.0
+    assert summary["cleaned_relaxed_accuracy"] == 1.0
+    assert summary["fixed_by_postprocess"] == 1
+    assert summary["broken_by_postprocess"] == 0
     assert summary["per_field_normalized_accuracy"]["total_amount"] == 1.0
     assert "relaxed_accuracy" in summary
     assert "per_field_relaxed_accuracy" in summary
@@ -72,4 +80,7 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
     assert (output_dir / "wrong_cases.csv").exists()
     assert (output_dir / "relaxed_wrong_cases.csv").exists()
     assert (output_dir / "address_wrong_cases.csv").exists()
+    assert (output_dir / "cleaned_wrong_cases.csv").exists()
+    assert (output_dir / "fixed_by_postprocess.csv").exists()
+    assert (output_dir / "broken_by_postprocess.csv").exists()
     assert (output_dir / "error_summary.json").exists()
