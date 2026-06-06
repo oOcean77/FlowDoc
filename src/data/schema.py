@@ -39,6 +39,7 @@ class DocumentQASample(BaseModel):
     ocr_text: str = ""
     bbox: Any | None = None
     source_dataset: str = "mock"
+    image_exists: bool = True
 
 
 REQUIRED_COLUMNS = list(DocumentQASample.model_fields.keys())

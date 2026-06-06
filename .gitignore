@@ -6,8 +6,12 @@ pytest-cache-files-*/
 .venv/
 venv/
 outputs/metrics/*.json
+outputs/metrics/*.md
 outputs/error_cases/*.csv
 outputs/workflow_payloads/*.json
+outputs/predictions/*.csv
 outputs/test_artifacts/
 data/processed/*.csv
+data/processed/*.jsonl
 data/samples/*.png
+data/raw/
