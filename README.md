@@ -119,6 +119,17 @@ LoRA smoke training validates the data, training, adapter-saving, and adapter-ev
 - Wrong-case analysis reports raw accuracy, normalized accuracy, per-field accuracy, and address-specific failures.
 - Tests are CPU-safe and do not load Qwen models.
 
+## Evaluation Metrics
+
+The main benchmark metric remains strict normalized field accuracy. This is the number used in the SROIE and mock-hard result tables.
+
+FlowDoc-VLM also includes field-aware relaxed metrics for diagnostics:
+
+- address, company, merchant, and vendor can be analyzed with token-level F1 and character similarity.
+- high-sensitivity fields such as total_amount, subtotal, tax, date, invoice_id, receipt_id, and document_id still require strict normalized exact match.
+- relaxed metrics help explain long-text failures, especially address extraction, where exact match is sensitive to line breaks, punctuation, word order, and OCR noise.
+- relaxed metrics do not replace post-processing. Address normalization, candidate line stitching, and field-specific cleanup are still required before production use.
+
 Related engineering notes:
 
 - [SROIE benchmark report](docs/sroie_benchmark_report.md)

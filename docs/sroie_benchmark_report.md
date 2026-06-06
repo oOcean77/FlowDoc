@@ -39,6 +39,19 @@ This suggests the model benefits from visual context overall, but address extrac
 
 Address matching is intentionally strict in the current field-level metric. It is sensitive to line breaks, punctuation, and token order, so future reporting should add token-level F1 or a field-specific address normalization metric.
 
+## Relaxed Field Evaluation
+
+Strict normalized accuracy remains the primary benchmark metric in this report. The SROIE image+OCR 100 score is still reported as `0.761` on 92 evaluated rows, with 8 skipped rows.
+
+Relaxed field metrics are added only as a diagnostic layer for long-text fields:
+
+- `address`, `company`, `merchant`, and `vendor` can use token-level F1 and character similarity.
+- `total_amount`, `subtotal`, `tax`, `date`, `invoice_id`, `receipt_id`, and `document_id` remain strict normalized exact-match fields.
+- Relaxed metrics should not be reported as the original field-level accuracy.
+- Relaxed metrics cannot replace post-processing, because downstream systems still need clean canonical strings.
+
+The intended use is to understand whether address/company failures are formatting or partial-match issues before investing in address post-processing or prompt changes.
+
 ## Mock Versus Real Data
 
 The mock hard-case benchmark showed that LoRA smoke training did not improve over the zero-shot image+OCR result:

@@ -30,7 +30,7 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
                 "doc_id": "d1",
                 "field_name": "address",
                 "gold_answer": "1 Main Road",
-                "pred_answer": "Main Road",
+                "pred_answer": "Warehouse Lane",
                 "strategy": "image_ocr",
                 "backend": "qwen2_5_vl",
                 "skipped": False,
@@ -57,10 +57,19 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
     assert summary["num_wrong"] == 1
     assert summary["raw_accuracy"] == 0.0
     assert summary["normalized_accuracy"] == 0.5
+    assert summary["relaxed_accuracy"] == 0.5
     assert summary["per_field_normalized_accuracy"]["total_amount"] == 1.0
+    assert "relaxed_accuracy" in summary
+    assert "per_field_relaxed_accuracy" in summary
+    assert "per_field_avg_token_f1" in summary
+    assert "per_field_avg_char_similarity" in summary
+    assert summary["per_field_relaxed_accuracy"]["address"] == 0.0
+    assert 0.0 <= summary["address_token_f1"] <= 1.0
+    assert 0.0 <= summary["address_char_similarity"] <= 1.0
     assert summary["per_field_wrong_cases"] == {"address": 1}
     assert summary["top_error_fields"] == [{"field_name": "address", "wrong_count": 1}]
     assert (output_dir / "skipped_samples.csv").exists()
     assert (output_dir / "wrong_cases.csv").exists()
+    assert (output_dir / "relaxed_wrong_cases.csv").exists()
     assert (output_dir / "address_wrong_cases.csv").exists()
     assert (output_dir / "error_summary.json").exists()
