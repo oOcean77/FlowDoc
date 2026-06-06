@@ -25,7 +25,7 @@ The 399-sample OCR-only full run and the 100-sample Qwen runs are not fully fair
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
 | SROIE real | OCR-only rule | OCR text | 100 | 100 | 0 | 0.320 | same-subset rule baseline |
 | SROIE real | Qwen2.5-VL zero-shot | OCR-only | 100 | 100 | 0 | 0.710 | same-subset VLM text baseline |
-| SROIE real | Qwen2.5-VL zero-shot | image+OCR | 100 | 92 | 8 | 0.761 | 100 requested; skipped rows need tracing |
+| SROIE real | Qwen2.5-VL zero-shot | image+OCR | 100 | 92 | 8 | 0.761 | 100 requested; 8 QA rows skipped due to CUDA OOM on two documents |
 
 ## Per-Field Observation
 
@@ -33,6 +33,7 @@ Address is the weakest field:
 
 - Qwen OCR-only address accuracy: `0.160`
 - Qwen image+OCR address accuracy: `0.217`
+- Qwen image+OCR wrong-case counts: address `18`, total_amount `2`, company `2`
 
 This suggests the model benefits from visual context overall, but address extraction remains hard because receipts often have long, multi-line address text and OCR/layout ambiguity.
 
@@ -51,6 +52,16 @@ The LoRA experiments validate the training and adapter evaluation loop, but they
 ## Current Conclusion
 
 The strongest current result is the real SROIE zero-shot Qwen image+OCR baseline on the 50-sample subset: `0.800`. The 100-sample image+OCR run has `8` skipped samples, so it must be interpreted as `92 evaluated / 100 requested`, not a full-100 score.
+
+The 100-sample SROIE image+OCR error summary is:
+
+- total rows: `100`
+- evaluated rows: `92`
+- skipped rows: `8`
+- skipped reason: CUDA OOM on two documents / 8 QA rows
+- raw accuracy: `0.696`
+- normalized accuracy: `0.761`
+- per-field normalized accuracy: address `0.217`, company `0.913`, date `1.000`, total_amount `0.913`
 
 The project value at this stage is:
 

@@ -107,6 +107,11 @@ def test_skipped_samples_summary_outputs_json_and_md() -> None:
             {"sample_id": "s2", "field_name": "address", "skipped": True, "skip_reason": "image decode failed"},
         ]
     ).to_csv(predictions_dir / "sroie_qwen_image_ocr_100_predictions.csv", index=False)
+    pd.DataFrame(
+        [
+            {"sample_id": "old", "field_name": "address", "skipped": True, "skip_reason": "legacy skipped"},
+        ]
+    ).to_csv(predictions_dir / "qwen2_5_vl_image_ocr_predictions.csv", index=False)
 
     summary = write_skipped_samples_summary(
         predictions_dir,
@@ -116,5 +121,8 @@ def test_skipped_samples_summary_outputs_json_and_md() -> None:
 
     assert summary["num_skipped_rows"] == 1
     assert summary["skip_reason_counts"] == {"image decode failed": 1}
+    assert summary["legacy_prediction_files_ignored"]
     assert (root / "skipped_samples_summary.json").exists()
-    assert "image decode failed" in (root / "skipped_samples_summary.md").read_text(encoding="utf-8")
+    md_text = (root / "skipped_samples_summary.md").read_text(encoding="utf-8")
+    assert "image decode failed" in md_text
+    assert "legacy skipped" not in md_text

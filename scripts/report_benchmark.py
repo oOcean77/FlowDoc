@@ -30,6 +30,14 @@ ALLOWED_PREFIXES = (
     "sroie_ocr_field_eval",
 )
 
+LEGACY_PREDICTION_FILENAMES = {
+    "dummy_image_ocr_predictions.csv",
+    "qwen2_5_vl_image_only_predictions.csv",
+    "qwen2_5_vl_image_ocr_predictions.csv",
+    "qwen2_5_vl_ocr_only_predictions.csv",
+    "qwen2_5_vl_lora_image_ocr_predictions.csv",
+}
+
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -157,8 +165,12 @@ def collect_skipped_prediction_rows(predictions_dir: str | Path = "outputs/predi
     rows: list[dict[str, Any]] = []
     reason_counts: Counter[str] = Counter()
     files_seen = 0
+    legacy_files_ignored: list[str] = []
     if root.exists():
         for path in sorted(root.glob("*_predictions.csv")):
+            if path.name in LEGACY_PREDICTION_FILENAMES:
+                legacy_files_ignored.append(str(path))
+                continue
             files_seen += 1
             df = pd.read_csv(path).fillna("")
             if "skipped" not in df.columns:
@@ -178,6 +190,7 @@ def collect_skipped_prediction_rows(predictions_dir: str | Path = "outputs/predi
     return {
         "predictions_dir": str(root),
         "prediction_files_seen": files_seen,
+        "legacy_prediction_files_ignored": legacy_files_ignored,
         "num_skipped_rows": len(rows),
         "skip_reason_counts": dict(sorted(reason_counts.items())),
         "skipped_samples": rows,
@@ -204,6 +217,15 @@ def write_skipped_samples_summary(
         f"Skipped rows: `{summary['num_skipped_rows']}`",
         "",
     ]
+    if summary["legacy_prediction_files_ignored"]:
+        lines.extend(
+            [
+                "Legacy prediction files ignored to avoid double-counting overwritten runs:",
+                "",
+                *[f"- `{path}`" for path in summary["legacy_prediction_files_ignored"]],
+                "",
+            ]
+        )
     if summary["trace_warning"]:
         lines.extend([summary["trace_warning"], ""])
     lines.extend(["## Skip Reasons", "", "| Skip Reason | Count |", "| --- | ---: |"])
@@ -297,6 +319,8 @@ def build_benchmark_report(
             f"Prediction files seen: `{skipped_summary['prediction_files_seen']}`. Skipped rows traced: `{skipped_summary['num_skipped_rows']}`.",
         ]
     )
+    if skipped_summary["legacy_prediction_files_ignored"]:
+        lines.append("Legacy prediction files were ignored to avoid double-counting old overwritten outputs.")
     if skipped_summary["trace_warning"]:
         lines.append(skipped_summary["trace_warning"])
     _append_sroie_same_subset(lines, rows)

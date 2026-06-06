@@ -95,6 +95,38 @@ If `WORKFLOW_AGENT_URL` is set, the workflow demo will POST to that service. Oth
 
 `field_level_accuracy` is a baseline validation number on the current mock data, not the final model capability of FlowDoc-VLM. The deliberately hard mock cases are meant to expose common OCR-only failures before image+OCR prompting or VLM-SFT is introduced.
 
+## Experiment Results
+
+Current results are split between the synthetic `mock-hard` benchmark and the real SROIE receipt benchmark. LoRA step10/step50 did not improve the mock image+OCR score, so FlowDoc-VLM does not claim LoRA quality gains.
+
+| Dataset | Method | Strategy | Accuracy | Samples / Notes |
+| --- | --- | --- | ---: | --- |
+| mock-hard | OCR-only rule | OCR text | 0.769 | 39 samples |
+| mock-hard | Qwen2.5-VL zero-shot | image-only | 0.692 | 39 samples |
+| mock-hard | Qwen2.5-VL zero-shot | OCR-only | 0.744 | 39 samples |
+| mock-hard | Qwen2.5-VL zero-shot | image+OCR | 0.718 | 39 samples |
+| mock-hard | Qwen2.5-VL LoRA step10 | image+OCR | 0.718 | smoke training only |
+| mock-hard | Qwen2.5-VL LoRA step50 | image+OCR | 0.718 | smoke training only |
+| SROIE-real | OCR-only rule | OCR text full | 0.298 | 399 QA samples |
+| SROIE-real | OCR-only rule | OCR text same-subset | 0.320 | 100 QA samples |
+| SROIE-real | Qwen2.5-VL zero-shot | OCR-only | 0.710 | 100 evaluated |
+| SROIE-real | Qwen2.5-VL zero-shot | image+OCR | 0.761 | 92 evaluated / 8 skipped due to CUDA OOM |
+| SROIE-real | Qwen2.5-VL zero-shot | image+OCR | 0.800 | 50 evaluated |
+
+The real-data conclusion is stronger than the mock conclusion: on SROIE same-subset 100, Qwen OCR-only and image+OCR are clearly above rule OCR. Address remains the largest bottleneck, with SROIE image+OCR normalized address accuracy at `0.217`.
+
+Reproduce the real-data benchmark after placing SROIE files under `data/raw/sroie/`:
+
+```bash
+python scripts/prepare_sroie_data.py --raw-dir data/raw/sroie --output data/processed/sroie_qa.csv --max-docs 100
+python scripts/run_field_eval.py --input data/processed/sroie_qa.csv --output outputs/metrics/sroie_ocr_field_eval.json
+python scripts/run_field_eval.py --input data/processed/sroie_qa_100.csv --output outputs/metrics/sroie_ocr_field_eval_100.json
+python scripts/run_vlm_baseline.py --input data/processed/sroie_qa_100.csv --strategy ocr_only --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --output outputs/metrics/sroie_qwen_ocr_only_100.json
+python scripts/run_vlm_baseline.py --input data/processed/sroie_qa_100.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --output outputs/metrics/sroie_qwen_image_ocr_100.json
+python scripts/report_benchmark.py
+python scripts/analyze_sroie_errors.py --predictions outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv --output-dir outputs/analysis/sroie
+```
+
 ## Week 2 Plan
 
 - prepare real-data-like CSV adapters for FUNSD, SROIE, DocVQA, and local unified records
