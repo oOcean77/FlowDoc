@@ -159,6 +159,32 @@ python scripts/check_sft_readiness.py --instruction-file data/processed/instruct
 
 Current mock data is intentionally too small for meaningful SFT. Do not train directly from the 39 mock QA rows; first obtain a real Qwen2.5-VL image+OCR baseline, enough instruction samples, valid image paths, train/eval split, CUDA, and required training packages.
 
+## Qwen2.5-VL LoRA SFT Dry Run
+
+The AutoDL zero-shot baselines currently provide the reference point before any training:
+
+- OCR-only rule baseline: `field_level_accuracy=0.769`
+- Qwen2.5-VL image-only: `field_level_accuracy=0.692`
+- Qwen2.5-VL image+OCR: `field_level_accuracy=0.718`
+- Qwen2.5-VL OCR-only: `field_level_accuracy=0.744`
+
+The LoRA script is an engineering dry-run scaffold, not a claim of model improvement:
+
+```bash
+python scripts/train_qwen_vl_lora.py --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --train-file data/processed/train_instructions.jsonl --eval-file data/processed/eval_instructions.jsonl --output-dir outputs/lora/qwen2_5_vl_flowdoc_dryrun --dry-run
+```
+
+Without `--dry-run`, the script attempts a tiny LoRA run with PEFT and writes `outputs/metrics/lora_dryrun_train_log.json`. The default settings are intentionally small: `max_steps=10`, `batch_size=1`, `gradient_accumulation_steps=4`, `lora_r=8`, `lora_alpha=16`, `learning_rate=1e-4`, `max_train_samples=20`, and `max_eval_samples=8`.
+
+Current limitations:
+
+- The 39 mock instruction rows are too small and will overfit.
+- The dry-run validates data loading, arguments, logging, and answer-only label masking; it does not prove model quality.
+- User prompt, OCR text, and prompt tokens are masked from loss in the text token sequence, but Qwen2.5-VL image token masking is marked as best-effort and must be audited before formal SFT.
+- Do not report dry-run loss or adapter outputs as model capability gains.
+- Formal SFT needs more real or realistic data, stable train/eval split, real zero-shot baseline metrics, CUDA, and verified adapter evaluation.
+- Loading a saved LoRA adapter through `run_vlm_baseline.py --lora-adapter ...` is a TODO; until that path is implemented and verified, do not report adapter evaluation metrics.
+
 ## Real Data Commands
 
 ```bash
