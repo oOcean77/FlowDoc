@@ -95,6 +95,38 @@ If `WORKFLOW_AGENT_URL` is set, the workflow demo will POST to that service. Oth
 
 `field_level_accuracy` is a baseline validation number on the current mock data, not the final model capability of FlowDoc-VLM. The deliberately hard mock cases are meant to expose common OCR-only failures before image+OCR prompting or VLM-SFT is introduced.
 
+## Experiment Results
+
+Current results are split between the synthetic `mock-hard` benchmark and the real SROIE receipt benchmark. LoRA step10/step50 did not improve the mock image+OCR score, so FlowDoc-VLM does not claim LoRA quality gains.
+
+| Dataset | Method | Strategy | Accuracy | Samples / Notes |
+| --- | --- | --- | ---: | --- |
+| mock-hard | OCR-only rule | OCR text | 0.769 | 39 samples |
+| mock-hard | Qwen2.5-VL zero-shot | image-only | 0.692 | 39 samples |
+| mock-hard | Qwen2.5-VL zero-shot | OCR-only | 0.744 | 39 samples |
+| mock-hard | Qwen2.5-VL zero-shot | image+OCR | 0.718 | 39 samples |
+| mock-hard | Qwen2.5-VL LoRA step10 | image+OCR | 0.718 | smoke training only |
+| mock-hard | Qwen2.5-VL LoRA step50 | image+OCR | 0.718 | smoke training only |
+| SROIE-real | OCR-only rule | OCR text full | 0.298 | 399 QA samples |
+| SROIE-real | OCR-only rule | OCR text same-subset | 0.320 | 100 QA samples |
+| SROIE-real | Qwen2.5-VL zero-shot | OCR-only | 0.710 | 100 evaluated |
+| SROIE-real | Qwen2.5-VL zero-shot | image+OCR | 0.761 | 92 evaluated / 8 skipped due to CUDA OOM |
+| SROIE-real | Qwen2.5-VL zero-shot | image+OCR | 0.800 | 50 evaluated |
+
+The real-data conclusion is stronger than the mock conclusion: on SROIE same-subset 100, Qwen OCR-only and image+OCR are clearly above rule OCR. Address remains the largest bottleneck, with SROIE image+OCR normalized address accuracy at `0.217`.
+
+Reproduce the real-data benchmark after placing SROIE files under `data/raw/sroie/`:
+
+```bash
+python scripts/prepare_sroie_data.py --raw-dir data/raw/sroie --output data/processed/sroie_qa.csv --max-docs 100
+python scripts/run_field_eval.py --input data/processed/sroie_qa.csv --output outputs/metrics/sroie_ocr_field_eval.json
+python scripts/run_field_eval.py --input data/processed/sroie_qa_100.csv --output outputs/metrics/sroie_ocr_field_eval_100.json
+python scripts/run_vlm_baseline.py --input data/processed/sroie_qa_100.csv --strategy ocr_only --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --output outputs/metrics/sroie_qwen_ocr_only_100.json
+python scripts/run_vlm_baseline.py --input data/processed/sroie_qa_100.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --output outputs/metrics/sroie_qwen_image_ocr_100.json
+python scripts/report_benchmark.py
+python scripts/analyze_sroie_errors.py --predictions outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv --output-dir outputs/analysis/sroie
+```
+
 ## Week 2 Plan
 
 - prepare real-data-like CSV adapters for FUNSD, SROIE, DocVQA, and local unified records
@@ -159,6 +191,53 @@ python scripts/check_sft_readiness.py --instruction-file data/processed/instruct
 
 Current mock data is intentionally too small for meaningful SFT. Do not train directly from the 39 mock QA rows; first obtain a real Qwen2.5-VL image+OCR baseline, enough instruction samples, valid image paths, train/eval split, CUDA, and required training packages.
 
+## Qwen2.5-VL LoRA SFT Dry Run
+
+The AutoDL zero-shot baselines currently provide the reference point before any training:
+
+- OCR-only rule baseline: `field_level_accuracy=0.769`
+- Qwen2.5-VL image-only: `field_level_accuracy=0.692`
+- Qwen2.5-VL image+OCR: `field_level_accuracy=0.718`
+- Qwen2.5-VL OCR-only: `field_level_accuracy=0.744`
+
+The LoRA script is an engineering dry-run scaffold, not a claim of model improvement:
+
+```bash
+python scripts/train_qwen_vl_lora.py --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --train-file data/processed/train_instructions.jsonl --eval-file data/processed/eval_instructions.jsonl --output-dir outputs/lora/qwen2_5_vl_flowdoc_dryrun --dry-run
+```
+
+Without `--dry-run`, the script attempts a tiny LoRA run with PEFT and writes `outputs/metrics/lora_dryrun_train_log.json`. The default settings are intentionally small: `max_steps=10`, `batch_size=1`, `gradient_accumulation_steps=4`, `lora_r=8`, `lora_alpha=16`, `learning_rate=1e-4`, `max_train_samples=20`, and `max_eval_samples=8`.
+
+Current limitations:
+
+- The 39 mock instruction rows are too small and will overfit.
+- The dry-run validates data loading, arguments, logging, and answer-only label masking; it does not prove model quality.
+- User prompt, OCR text, and prompt tokens are masked from loss in the text token sequence, but Qwen2.5-VL image token masking is marked as best-effort and must be audited before formal SFT.
+- Do not report dry-run loss or adapter outputs as model capability gains.
+- Formal SFT needs more real or realistic data, stable train/eval split, real zero-shot baseline metrics, CUDA, and verified adapter evaluation.
+- Loading a saved LoRA adapter through `run_vlm_baseline.py --lora-adapter ...` is supported; if the adapter path is missing or loading fails, the run is marked `skipped=true` and must not be reported as an adapter metric.
+
+## Evaluate LoRA Adapter
+
+After a LoRA adapter exists, evaluate it on the same input strategy and same evaluation CSV used by the zero-shot baselines:
+
+```bash
+python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --lora-adapter outputs/lora/qwen2_5_vl_flowdoc_dryrun --output outputs/metrics/vlm_baseline_qwen_lora_image_ocr_full.json
+python scripts/compare_baselines.py
+```
+
+The LoRA prediction CSV is written as:
+
+```text
+outputs/predictions/vlm_baseline_qwen_lora_image_ocr_full_predictions.csv
+```
+
+Prediction CSV names are derived from the metrics `--output` stem, so mock, SROIE, zero-shot, and LoRA runs do not overwrite each other. For example, `--output outputs/metrics/sroie_qwen_image_ocr_100.json` writes `outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv`, and the metrics JSON includes `predictions_path`.
+
+Only discuss LoRA improvement after adapter evaluation is complete and `skipped=false`. The 10-step smoke training mainly validates the training chain; with 39 mock instruction rows it can overfit and cannot support a formal model-capability claim. LoRA metrics must be compared against zero-shot baselines on the same input mode and evaluation set, such as the current AutoDL baselines: image-only `0.692`, image+OCR `0.718`, and OCR-only `0.744`.
+
+For adapter wrong-case review, filter the prediction CSV for rows where `pred_answer` does not match `gold_answer` after the same normalization used by evaluation. This project does not fabricate adapter error cases when adapter inference is skipped.
+
 ## Real Data Commands
 
 ```bash
@@ -166,6 +245,41 @@ python scripts/prepare_real_data.py --source funsd --input data/raw/funsd_like.c
 python scripts/prepare_real_data.py --source sroie --input data/raw/sroie_like.csv --output data/processed/sroie_qa.csv
 python scripts/prepare_real_data.py --source docvqa --input data/raw/docvqa_like.csv --output data/processed/docvqa_qa.csv
 ```
+
+## SROIE Real-Data Benchmark
+
+FlowDoc-VLM does not download or commit SROIE data. Put local SROIE files under `data/raw/sroie/` as described in [docs/sroie_data_format.md](docs/sroie_data_format.md), then run:
+
+```bash
+python scripts/prepare_sroie_data.py --raw-dir data/raw/sroie --output data/processed/sroie_qa.csv --max-docs 100
+
+python scripts/run_field_eval.py --input data/processed/sroie_qa.csv --output outputs/metrics/sroie_ocr_field_eval.json
+
+python scripts/run_vlm_baseline.py --input data/processed/sroie_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --max-samples 50 --output outputs/metrics/sroie_qwen_image_ocr_50.json
+
+python scripts/report_benchmark.py
+```
+
+If no real SROIE data is present, `prepare_sroie_data.py` fails with a clear error. It does not fabricate real-data results. See [docs/experiment_report.md](docs/experiment_report.md) for the current mock/LoRA conclusion and why the project is moving to real-data benchmarks.
+
+Current AutoDL SROIE results:
+
+- OCR-only rule full: `0.298` on `399` samples.
+- OCR-only rule same-subset 100: `0.320`.
+- Qwen2.5-VL OCR-only 100: `0.710` on `100` evaluated samples.
+- Qwen2.5-VL image+OCR 100: `0.761` on `92` evaluated samples with `8` skipped.
+- Qwen2.5-VL image+OCR 50: `0.800` on `50` evaluated samples.
+- Address remains the weakest field: Qwen OCR-only address `0.160`, image+OCR address `0.217`.
+
+See [docs/sroie_benchmark_report.md](docs/sroie_benchmark_report.md). LoRA step10/step50 on the mock set stayed at `0.718`, so FlowDoc-VLM does not claim LoRA improvement. The current priority is real-data benchmarking and error analysis.
+
+Analyze SROIE prediction errors:
+
+```bash
+python scripts/analyze_sroie_errors.py --predictions outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv --output-dir outputs/analysis/sroie
+```
+
+`report_benchmark.py` reads only benchmark metrics, excludes train logs and environment/readiness reports, writes `outputs/metrics/benchmark_report.md`, and aggregates skipped prediction rows into `outputs/metrics/skipped_samples_summary.json` and `outputs/metrics/skipped_samples_summary.md`.
 
 ## Week 3 Plan
 

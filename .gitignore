@@ -10,6 +10,7 @@ outputs/metrics/*.md
 outputs/error_cases/*.csv
 outputs/workflow_payloads/*.json
 outputs/predictions/*.csv
+outputs/lora/
 outputs/test_artifacts/
 data/processed/*.csv
 data/processed/*.jsonl

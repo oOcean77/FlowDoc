@@ -23,6 +23,7 @@ PREDICTION_COLUMNS = [
     "pred_answer",
     "strategy",
     "backend",
+    "lora_adapter",
     "skipped",
     "skip_reason",
 ]
@@ -35,6 +36,7 @@ def _make_runner(
     max_new_tokens: int = 64,
     temperature: float = 0.0,
     do_sample: bool = False,
+    lora_adapter: str | None = None,
 ):
     if backend == "dummy":
         return DummyVLMRunner()
@@ -45,6 +47,7 @@ def _make_runner(
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             do_sample=do_sample,
+            lora_adapter=lora_adapter,
         )
     if backend == "llava":
         return LLaVARunner(model_name=model_name or "llava-hf/llava-1.5-7b-hf", device=device)
@@ -58,14 +61,16 @@ def _prompt_from_instruction(sample: dict[str, Any]) -> str:
     return ""
 
 
-def _prediction_path(backend: str, strategy: str, predictions_dir: str | Path = "outputs/predictions") -> Path:
-    return Path(predictions_dir) / f"{backend}_{strategy}_predictions.csv"
+def _prediction_path(output_path: str | Path, predictions_dir: str | Path = "outputs/predictions") -> Path:
+    metrics_stem = Path(output_path).stem
+    return Path(predictions_dir) / f"{metrics_stem}_predictions.csv"
 
 
-def _skipped_metrics(backend: str, strategy: str, num_samples: int, reason: str) -> dict[str, Any]:
+def _skipped_metrics(backend: str, strategy: str, num_samples: int, reason: str, lora_adapter: str | None = None) -> dict[str, Any]:
     return {
         "backend": backend,
         "strategy": strategy,
+        "lora_adapter": lora_adapter,
         "num_samples": num_samples,
         "num_evaluated": 0,
         "num_skipped": num_samples,
@@ -77,7 +82,7 @@ def _skipped_metrics(backend: str, strategy: str, num_samples: int, reason: str)
     }
 
 
-def _skipped_predictions(rows: list[dict[str, Any]], strategy: str, backend: str, reason: str) -> list[dict[str, Any]]:
+def _skipped_predictions(rows: list[dict[str, Any]], strategy: str, backend: str, reason: str, lora_adapter: str | None = None) -> list[dict[str, Any]]:
     return [
         {
             "sample_id": row["sample_id"],
@@ -87,6 +92,7 @@ def _skipped_predictions(rows: list[dict[str, Any]], strategy: str, backend: str
             "pred_answer": "",
             "strategy": strategy,
             "backend": backend,
+            "lora_adapter": lora_adapter or "",
             "skipped": True,
             "skip_reason": reason,
         }
@@ -121,6 +127,7 @@ def run_vlm_baseline(
     temperature: float = 0.0,
     do_sample: bool = False,
     smoke_test: bool = False,
+    lora_adapter: str | None = None,
 ) -> dict[str, Any]:
     if strategy not in STRATEGIES:
         raise ValueError(f"Unsupported strategy '{strategy}'.")
@@ -129,7 +136,7 @@ def run_vlm_baseline(
     if effective_max_samples is not None:
         df = df.head(effective_max_samples)
     rows = df.to_dict(orient="records")
-    pred_path = _prediction_path(backend, strategy, predictions_dir)
+    pred_path = _prediction_path(output_path, predictions_dir)
     pred_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -140,12 +147,14 @@ def run_vlm_baseline(
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             do_sample=do_sample,
+            lora_adapter=lora_adapter,
         )
     except (ImportError, FileNotFoundError, RuntimeError, OSError, ValueError) as exc:
         reason = str(exc)
-        predictions = _skipped_predictions(rows, strategy, backend, reason)
+        predictions = _skipped_predictions(rows, strategy, backend, reason, lora_adapter=lora_adapter)
         pd.DataFrame(predictions, columns=PREDICTION_COLUMNS).to_csv(pred_path, index=False)
-        metrics = _skipped_metrics(backend, strategy, len(rows), reason)
+        metrics = _skipped_metrics(backend, strategy, len(rows), reason, lora_adapter=lora_adapter)
+        metrics["predictions_path"] = str(pred_path)
         metrics["smoke_test"] = smoke_test
         metrics["generation"] = {"max_new_tokens": max_new_tokens, "temperature": temperature, "do_sample": do_sample}
         if smoke_test:
@@ -155,9 +164,10 @@ def run_vlm_baseline(
 
     if isinstance(runner, DummyVLMRunner):
         reason = runner.skip_reason
-        predictions = _skipped_predictions(rows, strategy, backend, reason)
+        predictions = _skipped_predictions(rows, strategy, backend, reason, lora_adapter=lora_adapter)
         pd.DataFrame(predictions, columns=PREDICTION_COLUMNS).to_csv(pred_path, index=False)
-        metrics = _skipped_metrics(backend, strategy, len(rows), reason)
+        metrics = _skipped_metrics(backend, strategy, len(rows), reason, lora_adapter=lora_adapter)
+        metrics["predictions_path"] = str(pred_path)
         metrics["smoke_test"] = smoke_test
         metrics["generation"] = {"max_new_tokens": max_new_tokens, "temperature": temperature, "do_sample": do_sample}
         if smoke_test:
@@ -179,6 +189,7 @@ def run_vlm_baseline(
                 "pred_answer": "",
                 "strategy": strategy,
                 "backend": backend,
+                "lora_adapter": lora_adapter or "",
                 "skipped": True,
                 "skip_reason": sample["skip_reason"],
             }
@@ -201,6 +212,7 @@ def run_vlm_baseline(
             "pred_answer": pred,
             "strategy": strategy,
             "backend": backend,
+            "lora_adapter": lora_adapter or "",
             "skipped": result.skipped,
             "skip_reason": result.skip_reason or "",
         }
@@ -213,12 +225,13 @@ def run_vlm_baseline(
     pd.DataFrame(predictions, columns=PREDICTION_COLUMNS).to_csv(pred_path, index=False)
     if not eval_rows:
         reasons = sorted({row["skip_reason"] for row in predictions if row["skip_reason"]})
-        metrics = _skipped_metrics(backend, strategy, len(rows), "; ".join(reasons) or "no evaluable samples")
+        metrics = _skipped_metrics(backend, strategy, len(rows), "; ".join(reasons) or "no evaluable samples", lora_adapter=lora_adapter)
     else:
         evaluated = evaluate_rows(eval_rows)
         metrics = {
             "backend": backend,
             "strategy": strategy,
+            "lora_adapter": lora_adapter,
             "num_samples": len(rows),
             "num_evaluated": len(eval_rows),
             "num_skipped": len(rows) - len(eval_rows),
@@ -230,6 +243,7 @@ def run_vlm_baseline(
             "per_field_accuracy": evaluated["per_field_accuracy"],
         }
     metrics["smoke_test"] = smoke_test
+    metrics["predictions_path"] = str(pred_path)
     metrics["generation"] = {"max_new_tokens": max_new_tokens, "temperature": temperature, "do_sample": do_sample}
     if smoke_test:
         metrics["smoke_logs"] = _smoke_logs_from_predictions(smoke_logs)

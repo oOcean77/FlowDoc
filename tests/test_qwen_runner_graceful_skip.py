@@ -48,4 +48,6 @@ def test_qwen_baseline_missing_local_path_skips() -> None:
 
     assert metrics["skipped"] is True
     assert "Local Qwen2.5-VL model path does not exist" in metrics["skip_reason"]
-    assert (root / "predictions" / "qwen2_5_vl_image_ocr_predictions.csv").exists()
+    pred_path = Path(metrics["predictions_path"])
+    assert pred_path.name == "qwen_metrics_predictions.csv"
+    assert pred_path.exists()

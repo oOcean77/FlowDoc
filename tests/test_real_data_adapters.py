@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from scripts.prepare_sroie_data import prepare_sroie_dataframe, records_from_sroie_raw, sroie_stats
 from src.data.dataset_adapter import convert_csv, load_local_csv, write_processed_csv
 
 
@@ -55,3 +56,37 @@ def test_write_processed_csv() -> None:
     df = convert_csv("docvqa", source)
     write_processed_csv(df, output)
     assert output.exists()
+
+
+def test_sroie_like_csv_preparation() -> None:
+    root = Path("outputs/test_artifacts/sroie_prepare")
+    image = root / "receipt.jpg"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"fake-image")
+    csv_path = root / "sroie_like.csv"
+    pd.DataFrame(
+        [
+            {
+                "doc_id": "r1",
+                "image_path": str(image),
+                "ocr_text": "Shop Co\nTotal 9.99",
+                "company": "Shop Co",
+                "date": "2026-06-01",
+                "address": "1 Main Road",
+                "total": "9.99",
+            }
+        ]
+    ).to_csv(csv_path, index=False)
+
+    df = prepare_sroie_dataframe(input_csv=csv_path, max_docs=10)
+    stats = sroie_stats(df)
+
+    assert set(df["field_name"]) == {"company", "date", "address", "total_amount"}
+    assert stats["num_docs"] == 1
+    assert stats["num_qa_samples"] == 4
+    assert stats["missing_image_count"] == 0
+
+
+def test_sroie_raw_missing_files_error() -> None:
+    with pytest.raises(FileNotFoundError, match="SROIE raw directory not found"):
+        records_from_sroie_raw("outputs/test_artifacts/no_sroie_raw")
