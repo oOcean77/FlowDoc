@@ -197,8 +197,10 @@ python scripts/compare_baselines.py
 The LoRA prediction CSV is written as:
 
 ```text
-outputs/predictions/qwen2_5_vl_lora_image_ocr_predictions.csv
+outputs/predictions/vlm_baseline_qwen_lora_image_ocr_full_predictions.csv
 ```
+
+Prediction CSV names are derived from the metrics `--output` stem, so mock, SROIE, zero-shot, and LoRA runs do not overwrite each other. For example, `--output outputs/metrics/sroie_qwen_image_ocr_100.json` writes `outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv`, and the metrics JSON includes `predictions_path`.
 
 Only discuss LoRA improvement after adapter evaluation is complete and `skipped=false`. The 10-step smoke training mainly validates the training chain; with 39 mock instruction rows it can overfit and cannot support a formal model-capability claim. LoRA metrics must be compared against zero-shot baselines on the same input mode and evaluation set, such as the current AutoDL baselines: image-only `0.692`, image+OCR `0.718`, and OCR-only `0.744`.
 
@@ -242,8 +244,10 @@ See [docs/sroie_benchmark_report.md](docs/sroie_benchmark_report.md). LoRA step1
 Analyze SROIE prediction errors:
 
 ```bash
-python scripts/analyze_sroie_errors.py --predictions outputs/predictions/qwen2_5_vl_image_ocr_predictions.csv --output-dir outputs/error_cases/sroie_qwen_image_ocr
+python scripts/analyze_sroie_errors.py --predictions outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv --output-dir outputs/analysis/sroie
 ```
+
+`report_benchmark.py` reads only benchmark metrics, excludes train logs and environment/readiness reports, writes `outputs/metrics/benchmark_report.md`, and aggregates skipped prediction rows into `outputs/metrics/skipped_samples_summary.json` and `outputs/metrics/skipped_samples_summary.md`.
 
 ## Week 3 Plan
 

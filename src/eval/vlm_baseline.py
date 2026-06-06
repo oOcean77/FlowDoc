@@ -61,9 +61,9 @@ def _prompt_from_instruction(sample: dict[str, Any]) -> str:
     return ""
 
 
-def _prediction_path(backend: str, strategy: str, predictions_dir: str | Path = "outputs/predictions", lora_adapter: str | None = None) -> Path:
-    adapter_tag = "_lora" if lora_adapter else ""
-    return Path(predictions_dir) / f"{backend}{adapter_tag}_{strategy}_predictions.csv"
+def _prediction_path(output_path: str | Path, predictions_dir: str | Path = "outputs/predictions") -> Path:
+    metrics_stem = Path(output_path).stem
+    return Path(predictions_dir) / f"{metrics_stem}_predictions.csv"
 
 
 def _skipped_metrics(backend: str, strategy: str, num_samples: int, reason: str, lora_adapter: str | None = None) -> dict[str, Any]:
@@ -136,7 +136,7 @@ def run_vlm_baseline(
     if effective_max_samples is not None:
         df = df.head(effective_max_samples)
     rows = df.to_dict(orient="records")
-    pred_path = _prediction_path(backend, strategy, predictions_dir, lora_adapter=lora_adapter)
+    pred_path = _prediction_path(output_path, predictions_dir)
     pred_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -154,6 +154,7 @@ def run_vlm_baseline(
         predictions = _skipped_predictions(rows, strategy, backend, reason, lora_adapter=lora_adapter)
         pd.DataFrame(predictions, columns=PREDICTION_COLUMNS).to_csv(pred_path, index=False)
         metrics = _skipped_metrics(backend, strategy, len(rows), reason, lora_adapter=lora_adapter)
+        metrics["predictions_path"] = str(pred_path)
         metrics["smoke_test"] = smoke_test
         metrics["generation"] = {"max_new_tokens": max_new_tokens, "temperature": temperature, "do_sample": do_sample}
         if smoke_test:
@@ -166,6 +167,7 @@ def run_vlm_baseline(
         predictions = _skipped_predictions(rows, strategy, backend, reason, lora_adapter=lora_adapter)
         pd.DataFrame(predictions, columns=PREDICTION_COLUMNS).to_csv(pred_path, index=False)
         metrics = _skipped_metrics(backend, strategy, len(rows), reason, lora_adapter=lora_adapter)
+        metrics["predictions_path"] = str(pred_path)
         metrics["smoke_test"] = smoke_test
         metrics["generation"] = {"max_new_tokens": max_new_tokens, "temperature": temperature, "do_sample": do_sample}
         if smoke_test:
@@ -241,6 +243,7 @@ def run_vlm_baseline(
             "per_field_accuracy": evaluated["per_field_accuracy"],
         }
     metrics["smoke_test"] = smoke_test
+    metrics["predictions_path"] = str(pred_path)
     metrics["generation"] = {"max_new_tokens": max_new_tokens, "temperature": temperature, "do_sample": do_sample}
     if smoke_test:
         metrics["smoke_logs"] = _smoke_logs_from_predictions(smoke_logs)

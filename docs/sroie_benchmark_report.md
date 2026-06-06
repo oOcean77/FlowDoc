@@ -1,6 +1,6 @@
 # SROIE Benchmark Report
 
-This report summarizes the current real SROIE-style receipt benchmark results provided from AutoDL. The prepared SROIE benchmark has 100 receipt documents and 399 QA samples. No training is run in this reporting step.
+This report summarizes the current real SROIE-style receipt benchmark results provided from AutoDL. The prepared SROIE train subset has 100 receipt documents and 399 QA samples across `company`, `date`, `address`, and `total_amount`. No training is run in this reporting step.
 
 ## Setup
 
@@ -19,6 +19,14 @@ This report summarizes the current real SROIE-style receipt benchmark results pr
 | SROIE real | Qwen2.5-VL zero-shot | image+OCR | 100 | 92 | 8 | 0.761 |
 | SROIE real | Qwen2.5-VL zero-shot | image+OCR | 50 | 50 | 0 | 0.800 |
 
+The 399-sample OCR-only full run and the 100-sample Qwen runs are not fully fair horizontal comparisons. The same-subset 100 results are the better comparison point:
+
+| Dataset | Method | Strategy | Requested | Evaluated | Skipped | Accuracy | Notes |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| SROIE real | OCR-only rule | OCR text | 100 | 100 | 0 | 0.320 | same-subset rule baseline |
+| SROIE real | Qwen2.5-VL zero-shot | OCR-only | 100 | 100 | 0 | 0.710 | same-subset VLM text baseline |
+| SROIE real | Qwen2.5-VL zero-shot | image+OCR | 100 | 92 | 8 | 0.761 | 100 requested; skipped rows need tracing |
+
 ## Per-Field Observation
 
 Address is the weakest field:
@@ -27,6 +35,8 @@ Address is the weakest field:
 - Qwen image+OCR address accuracy: `0.217`
 
 This suggests the model benefits from visual context overall, but address extraction remains hard because receipts often have long, multi-line address text and OCR/layout ambiguity.
+
+Address matching is intentionally strict in the current field-level metric. It is sensitive to line breaks, punctuation, and token order, so future reporting should add token-level F1 or a field-specific address normalization metric.
 
 ## Mock Versus Real Data
 
@@ -57,7 +67,23 @@ It is not yet a claim of SOTA or a proven LoRA improvement.
 After running a SROIE prediction CSV, export skipped and wrong cases:
 
 ```bash
-python scripts/analyze_sroie_errors.py --predictions outputs/predictions/qwen2_5_vl_image_ocr_predictions.csv --output-dir outputs/error_cases/sroie_qwen_image_ocr
+python scripts/analyze_sroie_errors.py --predictions outputs/predictions/sroie_qwen_image_ocr_100_predictions.csv --output-dir outputs/analysis/sroie
 ```
 
-This writes skipped samples, wrong cases, per-field wrong counts, and address error examples.
+This writes skipped samples, wrong cases, per-field wrong counts, address wrong cases, and `outputs/analysis/sroie/error_summary.json`.
+
+Generate the aggregate benchmark and skipped-row reports:
+
+```bash
+python scripts/report_benchmark.py
+```
+
+This writes `outputs/metrics/benchmark_report.md`, `outputs/metrics/skipped_samples_summary.json`, and `outputs/metrics/skipped_samples_summary.md`. If prediction CSV files were overwritten or are missing, the skipped summary explicitly says that skipped rows cannot be traced.
+
+## Current Limitations
+
+- Only the first 100 SROIE train documents are represented in the current benchmark.
+- The 100-sample Qwen image+OCR run has 8 skipped rows.
+- A larger sample, a held-out test split, and strict same-subset evaluation are still needed.
+- Address extraction needs a better metric than strict normalized exact match.
+- LoRA mock step10/step50 results did not improve over zero-shot and must not be mixed with SROIE zero-shot conclusions.

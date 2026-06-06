@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -53,14 +52,15 @@ def test_analyze_sroie_predictions_outputs_wrong_and_skipped() -> None:
 
     summary = analyze_predictions(predictions, output_dir)
 
-    assert summary["num_skipped"] == 1
+    assert summary["skipped"] == 1
+    assert summary["evaluated"] == 2
     assert summary["num_wrong"] == 1
+    assert summary["raw_accuracy"] == 0.0
+    assert summary["normalized_accuracy"] == 0.5
+    assert summary["per_field_normalized_accuracy"]["total_amount"] == 1.0
     assert summary["per_field_wrong_cases"] == {"address": 1}
+    assert summary["top_error_fields"] == [{"field_name": "address", "wrong_count": 1}]
     assert (output_dir / "skipped_samples.csv").exists()
     assert (output_dir / "wrong_cases.csv").exists()
-    assert (output_dir / "address_wrong_examples.csv").exists()
-    assert Path("outputs/metrics/skipped_samples_summary.json").exists()
-    saved = json.loads((output_dir / "sroie_error_summary.json").read_text(encoding="utf-8"))
-    assert saved["num_evaluated"] == 2
-    skipped_summary = json.loads(Path("outputs/metrics/skipped_samples_summary.json").read_text(encoding="utf-8"))
-    assert skipped_summary["skipped_samples"][0]["sample_id"] == "s3"
+    assert (output_dir / "address_wrong_cases.csv").exists()
+    assert (output_dir / "error_summary.json").exists()
