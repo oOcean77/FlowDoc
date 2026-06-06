@@ -3,11 +3,14 @@ model:
   model_name: Qwen/Qwen2.5-VL-3B-Instruct
   device: auto
   max_new_tokens: 64
+  temperature: 0.0
+  do_sample: false
 
 data:
   input: data/processed/mock_qa.csv
   strategy: image_ocr
-  max_samples: 20
+  max_samples: 3
+  smoke_test: true
 
 outputs:
   metrics_dir: outputs/metrics

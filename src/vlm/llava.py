@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image
-
-from src.vlm.base import VLMRunner
+from src.vlm.base import VLMGenerationResult, VLMRunner
 
 
 class LLaVARunner(VLMRunner):
@@ -24,17 +22,25 @@ class LLaVARunner(VLMRunner):
             self.model = self.model.to(device)
 
     def generate(self, image_path: str | None, prompt: str, **kwargs) -> str:
+        return self.generate_result(image_path, prompt, **kwargs).text
+
+    def generate_result(self, image_path: str | None, prompt: str, **kwargs) -> VLMGenerationResult:
         if not image_path:
-            raise ValueError("LLaVA backend requires image_path for inference.")
+            return VLMGenerationResult(text="", skipped=True, skip_reason="LLaVA backend requires image_path for inference.")
         path = Path(image_path)
         if not path.exists():
             path = Path.cwd().joinpath(path)
         if not path.exists():
-            raise FileNotFoundError(f"Image not found for LLaVA inference: {image_path}")
-        image = Image.open(path).convert("RGB")
-        llava_prompt = f"USER: <image>\n{prompt}\nASSISTANT:"
-        inputs = self.processor(text=llava_prompt, images=image, return_tensors="pt")
-        if hasattr(self.model, "device"):
-            inputs = inputs.to(self.model.device)
-        output = self.model.generate(**inputs, max_new_tokens=kwargs.get("max_new_tokens", 64))
-        return self.processor.decode(output[0], skip_special_tokens=True).split("ASSISTANT:")[-1].strip()
+            return VLMGenerationResult(text="", skipped=True, skip_reason=f"Image not found for LLaVA inference: {image_path}")
+        try:
+            from PIL import Image
+            image = Image.open(path).convert("RGB")
+            llava_prompt = f"USER: <image>\n{prompt}\nASSISTANT:"
+            inputs = self.processor(text=llava_prompt, images=image, return_tensors="pt")
+            if hasattr(self.model, "device"):
+                inputs = inputs.to(self.model.device)
+            output = self.model.generate(**inputs, max_new_tokens=kwargs.get("max_new_tokens", 64))
+            text = self.processor.decode(output[0], skip_special_tokens=True).split("ASSISTANT:")[-1].strip()
+            return VLMGenerationResult(text=text)
+        except Exception as exc:
+            return VLMGenerationResult(text="", skipped=True, skip_reason=str(exc))

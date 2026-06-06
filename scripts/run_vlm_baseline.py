@@ -19,6 +19,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--output", required=True)
     parser.add_argument("--max-new-tokens", type=int, default=64)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--do-sample", action="store_true")
+    parser.add_argument("--smoke-test", action="store_true")
     return parser.parse_args()
 
 
@@ -34,6 +37,9 @@ def main() -> int:
             max_samples=args.max_samples,
             device=args.device,
             max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            do_sample=args.do_sample,
+            smoke_test=args.smoke_test,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -43,6 +49,17 @@ def main() -> int:
         print(f"skipped=true reason={metrics.get('skip_reason')}")
     else:
         print(f"field_level_accuracy={metrics.get('field_level_accuracy'):.3f}")
+    if args.smoke_test:
+        for item in metrics.get("smoke_logs", []):
+            print(
+                "smoke "
+                f"sample_id={item['sample_id']} "
+                f"field_name={item['field_name']} "
+                f"strategy={item['strategy']} "
+                f"skipped={item['skipped']} "
+                f"skip_reason={item['skip_reason']} "
+                f"pred_answer={item['pred_answer_preview']}"
+            )
     return 0
 
 

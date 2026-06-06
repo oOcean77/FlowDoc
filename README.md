@@ -67,6 +67,7 @@ python scripts/prepare_mock_data.py
 python scripts/run_field_eval.py
 python scripts/export_error_cases.py
 python scripts/build_instruction_data.py --input data/processed/mock_qa.csv --strategy image_ocr --output data/processed/instructions_mock_image_ocr.jsonl
+python scripts/check_vlm_env.py
 python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend dummy --output outputs/metrics/vlm_baseline_dummy_image_ocr.json
 python scripts/compare_baselines.py
 python scripts/demo_workflow_integration.py
@@ -107,6 +108,34 @@ If `WORKFLOW_AGENT_URL` is set, the workflow demo will POST to that service. Oth
 - `image_ocr`: image path plus question plus OCR text.
 
 If a real Qwen2.5-VL or LLaVA environment is not installed, `run_vlm_baseline.py` writes `skipped=true` with a clear `skip_reason` and leaves accuracy fields as `null`. The dummy backend is always skipped and is only for pipeline validation.
+
+## Run Qwen2.5-VL Smoke Baseline
+
+Start with an environment check. This does not download a model:
+
+```bash
+python scripts/check_vlm_env.py
+```
+
+Run the dummy pipeline check:
+
+```bash
+python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend dummy --output outputs/metrics/vlm_baseline_dummy_image_ocr.json
+```
+
+Run a Qwen2.5-VL smoke test with the default Hugging Face repo id:
+
+```bash
+python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name Qwen/Qwen2.5-VL-3B-Instruct --max-samples 3 --smoke-test --output outputs/metrics/vlm_baseline_qwen_image_ocr_smoke.json
+```
+
+Run the same smoke test with a local model path:
+
+```bash
+python scripts/run_vlm_baseline.py --input data/processed/mock_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name E:\models\Qwen2.5-VL-3B-Instruct --max-samples 3 --smoke-test --output outputs/metrics/vlm_baseline_qwen_local_image_ocr_smoke.json
+```
+
+If dependencies, model files, network access, image files, or GPU resources are unavailable, the result is `skipped=true` with a `skip_reason`. A skipped result is an environment or availability status, not evidence that the model is inaccurate. Skipped runs must not be reported as real VLM metrics. Prediction postprocessing only strips common answer prefixes and lightly extracts amount/date/id values for evaluation normalization; it is not a substitute for model correctness.
 
 ## Real Data Commands
 

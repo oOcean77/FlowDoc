@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
-vlm = ["torch", "transformers"]
+vlm = ["torch", "transformers", "qwen-vl-utils"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

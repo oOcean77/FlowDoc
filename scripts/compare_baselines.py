@@ -19,6 +19,14 @@ def _format_metric(value: object) -> str:
     return "unavailable" if value is None else f"{float(value):.3f}"
 
 
+def _status(metrics: dict) -> str:
+    if metrics.get("skipped"):
+        return "skipped"
+    if metrics.get("field_level_accuracy") is None:
+        return "unavailable"
+    return "evaluated"
+
+
 def build_report(metrics_dir: Path = METRICS_DIR, output_path: Path = OUTPUT_PATH) -> Path:
     lines = [
         "# Baseline Comparison",
@@ -49,7 +57,7 @@ def build_report(metrics_dir: Path = METRICS_DIR, output_path: Path = OUTPUT_PAT
         lines.append("| none | none | unavailable | 0 | unavailable | no VLM baseline metrics found |")
     for path in vlm_paths:
         metrics = _load_json(path)
-        status = "skipped" if metrics.get("skipped") else "available"
+        status = _status(metrics)
         reason = metrics.get("skip_reason") or ""
         lines.append(
             f"| {metrics.get('backend')} | {metrics.get('strategy')} | {status} | "
