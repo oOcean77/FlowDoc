@@ -212,6 +212,22 @@ python scripts/prepare_real_data.py --source sroie --input data/raw/sroie_like.c
 python scripts/prepare_real_data.py --source docvqa --input data/raw/docvqa_like.csv --output data/processed/docvqa_qa.csv
 ```
 
+## SROIE Real-Data Benchmark
+
+FlowDoc-VLM does not download or commit SROIE data. Put local SROIE files under `data/raw/sroie/` as described in [docs/sroie_data_format.md](docs/sroie_data_format.md), then run:
+
+```bash
+python scripts/prepare_sroie_data.py --raw-dir data/raw/sroie --output data/processed/sroie_qa.csv --max-docs 100
+
+python scripts/run_field_eval.py --input data/processed/sroie_qa.csv --output outputs/metrics/sroie_ocr_field_eval.json
+
+python scripts/run_vlm_baseline.py --input data/processed/sroie_qa.csv --strategy image_ocr --backend qwen2_5_vl --model-name /root/autodl-tmp/models/Qwen/Qwen2___5-VL-3B-Instruct --max-samples 50 --output outputs/metrics/sroie_qwen_image_ocr_50.json
+
+python scripts/report_benchmark.py
+```
+
+If no real SROIE data is present, `prepare_sroie_data.py` fails with a clear error. It does not fabricate real-data results. See [docs/experiment_report.md](docs/experiment_report.md) for the current mock/LoRA conclusion and why the project is moving to real-data benchmarks.
+
 ## Week 3 Plan
 
 - LoRA rank ablation

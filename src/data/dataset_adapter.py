@@ -109,8 +109,17 @@ def convert_sroie_like(records: list[dict[str, Any]]) -> pd.DataFrame:
         doc_id = _first_present(record, ["doc_id", "image_id"], f"sroie_doc_{index:04d}")
         image_path = _first_present(record, ["image_path", "image"], "")
         ocr_text = _first_present(record, ["ocr_text", "text"], "")
+        entities = record.get("entities")
+        if isinstance(entities, str) and entities:
+            try:
+                import json
+
+                entities = json.loads(entities)
+            except ValueError:
+                entities = None
+        merged_record = {**record, **entities} if isinstance(entities, dict) else record
         for raw_key, (field_name, field_type) in field_map.items():
-            if raw_key not in record or record.get(raw_key) in (None, ""):
+            if raw_key not in merged_record or merged_record.get(raw_key) in (None, ""):
                 continue
             rows.append(
                 {
@@ -119,7 +128,7 @@ def convert_sroie_like(records: list[dict[str, Any]]) -> pd.DataFrame:
                     "doc_type": "receipt",
                     "image_path": image_path,
                     "question": f"What is the {field_name}?",
-                    "answer": record.get(raw_key, ""),
+                    "answer": merged_record.get(raw_key, ""),
                     "field_name": field_name,
                     "field_type": field_type,
                     "ocr_text": ocr_text,
