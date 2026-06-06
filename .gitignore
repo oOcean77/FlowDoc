@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.venv/
+venv/
+outputs/metrics/*.json
+outputs/error_cases/*.csv
+outputs/workflow_payloads/*.json
+outputs/test_artifacts/
+data/processed/*.csv
+data/samples/*.png

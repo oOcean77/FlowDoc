@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flowdoc-vlm"
+version = "0.1.0"
+description = "Enterprise document image field extraction and multimodal evaluation MVP."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pandas",
+  "pillow",
+  "pydantic>=2",
+  "requests",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+vlm = ["torch", "transformers"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"

@@ -1,0 +1,2 @@
+workflow_agent_url: ${WORKFLOW_AGENT_URL}
+offline_payload_path: outputs/workflow_payloads/payload.json
