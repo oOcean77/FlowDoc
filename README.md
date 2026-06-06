@@ -228,6 +228,23 @@ python scripts/report_benchmark.py
 
 If no real SROIE data is present, `prepare_sroie_data.py` fails with a clear error. It does not fabricate real-data results. See [docs/experiment_report.md](docs/experiment_report.md) for the current mock/LoRA conclusion and why the project is moving to real-data benchmarks.
 
+Current AutoDL SROIE results:
+
+- OCR-only rule full: `0.298` on `399` samples.
+- OCR-only rule same-subset 100: `0.320`.
+- Qwen2.5-VL OCR-only 100: `0.710` on `100` evaluated samples.
+- Qwen2.5-VL image+OCR 100: `0.761` on `92` evaluated samples with `8` skipped.
+- Qwen2.5-VL image+OCR 50: `0.800` on `50` evaluated samples.
+- Address remains the weakest field: Qwen OCR-only address `0.160`, image+OCR address `0.217`.
+
+See [docs/sroie_benchmark_report.md](docs/sroie_benchmark_report.md). LoRA step10/step50 on the mock set stayed at `0.718`, so FlowDoc-VLM does not claim LoRA improvement. The current priority is real-data benchmarking and error analysis.
+
+Analyze SROIE prediction errors:
+
+```bash
+python scripts/analyze_sroie_errors.py --predictions outputs/predictions/qwen2_5_vl_image_ocr_predictions.csv --output-dir outputs/error_cases/sroie_qwen_image_ocr
+```
+
 ## Week 3 Plan
 
 - LoRA rank ablation

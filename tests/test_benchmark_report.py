@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.report_benchmark import build_benchmark_report
+from scripts.report_benchmark import build_benchmark_report, collect_benchmark_rows
 
 
 def test_benchmark_report_generation() -> None:
@@ -13,14 +13,33 @@ def test_benchmark_report_generation() -> None:
         json.dumps({"dataset": "mock-hard", "baseline_family": "ocr-only", "num_samples": 39, "field_level_accuracy": 0.769}),
         encoding="utf-8",
     )
-    (root / "sroie_qwen_image_ocr_50.json").write_text(
+    (root / "vlm_env_report.json").write_text(json.dumps({"python": "3.12"}), encoding="utf-8")
+    (root / "lora_dryrun_train_log.json").write_text(json.dumps({"final_loss": 0.3}), encoding="utf-8")
+    (root / "sft_readiness_report.json").write_text(json.dumps({"ready": False}), encoding="utf-8")
+    (root / "sroie_qwen_image_ocr_100.json").write_text(
         json.dumps(
             {
                 "backend": "qwen2_5_vl",
                 "strategy": "image_ocr",
-                "num_evaluated": 50,
+                "num_samples": 100,
+                "num_evaluated": 92,
+                "num_skipped": 8,
                 "skipped": False,
-                "field_level_accuracy": 0.7,
+                "field_level_accuracy": 0.761,
+                "per_field_accuracy": {"address": 0.217, "total_amount": 0.9},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "sroie_ocr_field_eval_100.json").write_text(
+        json.dumps(
+            {
+                "dataset": "sroie-real",
+                "baseline_family": "ocr-only",
+                "strategy": "ocr_text",
+                "num_samples": 100,
+                "field_level_accuracy": 0.32,
+                "per_field_accuracy": {"address": 0.1, "total_amount": 0.8},
             }
         ),
         encoding="utf-8",
@@ -39,11 +58,17 @@ def test_benchmark_report_generation() -> None:
         encoding="utf-8",
     )
 
+    rows = collect_benchmark_rows(root)
     output = build_benchmark_report(root, root / "benchmark_report.md")
     text = output.read_text(encoding="utf-8")
 
+    assert all("report" not in row["file"] and "train_log" not in row["file"] for row in rows)
     assert "mock-hard" in text
-    assert "sroie-real" in text
+    assert "sroie-real-100" in text
     assert "zero-shot" in text
     assert "LoRA" in text
     assert "evaluated" in text
+    assert "Skipped Samples Summary" in text
+    assert "SROIE Same-Subset 100 Comparison" in text
+    assert "SROIE Per-Field Comparison" in text
+    assert "address" in text
