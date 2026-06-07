@@ -16,3 +16,14 @@ data/processed/*.csv
 data/processed/*.jsonl
 data/samples/*.png
 data/raw/
+# Local datasets / archives / experiment artifacts
+archive/
+userdoc/
+outputs/
+*.tar.gz
+*.zip
+
+# Python/cache artifacts
+__pycache__/
+.pytest_cache/
+*.pyc
